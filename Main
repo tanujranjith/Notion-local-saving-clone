@@ -1,0 +1,1007 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { v4 as uuidv4 } from "uuid";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  Plus,
+  Save,
+  Upload,
+  CloudUpload,
+  CloudDownload,
+  FolderOpen,
+  FileJson,
+  LogIn,
+  LogOut,
+  Trash2,
+  Search,
+  MoreVertical,
+  CheckSquare,
+  Type,
+  Heading,
+  List,
+  Code,
+  Image as ImageIcon,
+} from "lucide-react";
+
+/**
+ * Vibe — a Notion‑ish notes app
+ *
+ * Features
+ * - Pages with block-based editing (heading, text, todo, bullet list, code, image)
+ * - Autosave to localStorage ("vibe.workspace")
+ * - Import/Export workspace (.json)
+ * - File System Access API (save/open .vibe.json locally)
+ * - Optional Google Drive save/load (requires client id + api key)
+ * - Keyboard niceties: Enter to add block, / to change type, Cmd/Ctrl+S to quick save
+ *
+ * This file is self-contained. Paste in a React project or run in this preview.
+ */
+
+// === Google Drive (configure these) ===
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"; // <-- replace
+const GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"; // <-- replace
+const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file";
+
+// === Types ===
+const BLOCK_TYPES = ["text", "heading", "todo", "bulleted", "code", "image"] as const;
+
+type BlockType = (typeof BLOCK_TYPES)[number];
+
+interface BlockBase {
+  id: string;
+  type: BlockType;
+}
+
+interface TextBlock extends BlockBase {
+  type: "text" | "heading" | "bulleted" | "code";
+  text: string;
+  language?: string; // for code
+}
+
+interface TodoBlock extends BlockBase {
+  type: "todo";
+  text: string;
+  checked: boolean;
+}
+
+interface ImageBlock extends BlockBase {
+  type: "image";
+  imageDataUrl: string; // base64 data URL
+  caption?: string;
+}
+
+type Block = TextBlock | TodoBlock | ImageBlock;
+
+interface Page {
+  id: string;
+  title: string;
+  blocks: Block[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface Workspace {
+  version: number;
+  pages: Record<string, Page>;
+  pageOrder: string[];
+  selectedPageId?: string | null;
+}
+
+// === Utilities ===
+const now = () => Date.now();
+
+function newPage(title = "Untitled"): Page {
+  return {
+    id: uuidv4(),
+    title,
+    blocks: [
+      { id: uuidv4(), type: "heading", text: title },
+      { id: uuidv4(), type: "text", text: "Write something…" },
+    ],
+    createdAt: now(),
+    updatedAt: now(),
+  };
+}
+
+function emptyWorkspace(): Workspace {
+  const page = newPage("Welcome to Vibe");
+  page.blocks = [
+    { id: uuidv4(), type: "heading", text: "Welcome to Vibe" },
+    {
+      id: uuidv4(),
+      type: "text",
+      text:
+        "This lightweight Notion-like editor supports pages, blocks, local save, file save, and Google Drive (optional). Use / to change block type, Enter to add a block. ☺",
+    },
+    { id: uuidv4(), type: "bulleted", text: "Text, Heading, Todo, Bulleted, Code, Image" },
+    { id: uuidv4(), type: "todo", text: "Try adding a todo block", checked: false },
+    { id: uuidv4(), type: "code", text: "console.log('Hello Vibe!')", language: "javascript" },
+  ];
+  return {
+    version: 1,
+    pages: { [page.id]: page },
+    pageOrder: [page.id],
+    selectedPageId: page.id,
+  };
+}
+
+function clone<T>(x: T): T {
+  return JSON.parse(JSON.stringify(x));
+}
+
+// === Local Persistence ===
+const STORAGE_KEY = "vibe.workspace";
+
+function loadFromLocalStorage(): Workspace | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as Workspace;
+  } catch (e) {
+    console.warn("Failed to load workspace", e);
+    return null;
+  }
+}
+
+function saveToLocalStorage(ws: Workspace) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ws));
+  } catch (e) {
+    console.warn("Failed to save workspace", e);
+  }
+}
+
+// === File System Access API helpers ===
+async function saveFileNative(contents: string, suggestedName = "vibe-workspace.json") {
+  // Use File System Access API if available
+  // Fallback to download if not available
+  // @ts-ignore
+  if (window.showSaveFilePicker) {
+    // @ts-ignore
+    const handle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [
+        {
+          description: "Vibe Workspace JSON",
+          accept: { "application/json": [".json", ".vibe.json"] },
+        },
+      ],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(contents);
+    await writable.close();
+    return true;
+  } else {
+    const blob = new Blob([contents], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  }
+}
+
+async function openFileNative(): Promise<string | null> {
+  // @ts-ignore
+  if (window.showOpenFilePicker) {
+    // @ts-ignore
+    const [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [
+        {
+          description: "Vibe Workspace JSON",
+          accept: { "application/json": [".json", ".vibe.json"] },
+        },
+      ],
+    });
+    const file = await handle.getFile();
+    return await file.text();
+  } else {
+    return new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,.vibe.json,application/json";
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsText(file);
+      };
+      input.click();
+    });
+  }
+}
+
+// === Google API loader ===
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) return resolve();
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load script: " + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureGoogleApisLoaded() {
+  await loadScript("https://accounts.google.com/gsi/client");
+  await loadScript("https://apis.google.com/js/api.js");
+  // @ts-ignore
+  if (!window.gapi) throw new Error("gapi not available");
+}
+
+// === Main Component ===
+export default function VibeApp() {
+  const [ws, setWs] = useState<Workspace>(() => loadFromLocalStorage() ?? emptyWorkspace());
+  const [filter, setFilter] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [driveReady, setDriveReady] = useState(false);
+  const [driveToken, setDriveToken] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [showSlashMenu, setShowSlashMenu] = useState<{ pageId: string; blockId: string } | null>(null);
+
+  // Autosave
+  useEffect(() => {
+    saveToLocalStorage(ws);
+  }, [ws]);
+
+  // Keyboard: quick save, new block
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        quickSaveFile();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ws]);
+
+  const pages = ws.pageOrder.map((id) => ws.pages[id]).filter(Boolean);
+  const selectedPage = ws.selectedPageId ? ws.pages[ws.selectedPageId] : null;
+
+  function updateWorkspace(mutator: (draft: Workspace) => void) {
+    setWs((prev) => {
+      const draft = clone(prev);
+      mutator(draft);
+      return draft;
+    });
+  }
+
+  function createPage() {
+    const page = newPage("Untitled");
+    updateWorkspace((draft) => {
+      draft.pages[page.id] = page;
+      draft.pageOrder.unshift(page.id);
+      draft.selectedPageId = page.id;
+    });
+  }
+
+  function deletePage(id: string) {
+    updateWorkspace((draft) => {
+      delete draft.pages[id];
+      draft.pageOrder = draft.pageOrder.filter((x) => x !== id);
+      if (draft.selectedPageId === id) draft.selectedPageId = draft.pageOrder[0] ?? null;
+    });
+  }
+
+  function setSelectedPage(id: string) {
+    updateWorkspace((draft) => {
+      draft.selectedPageId = id;
+    });
+  }
+
+  function setPageTitle(id: string, title: string) {
+    updateWorkspace((draft) => {
+      const p = draft.pages[id];
+      if (!p) return;
+      p.title = title;
+      const heading = p.blocks.find((b) => b.type === "heading") as TextBlock | undefined;
+      if (heading) heading.text = title || "Untitled";
+      p.updatedAt = now();
+    });
+  }
+
+  function addBlock(pageId: string, type: BlockType = "text") {
+    const block: Block =
+      type === "todo"
+        ? { id: uuidv4(), type: "todo", text: "", checked: false }
+        : type === "image"
+        ? { id: uuidv4(), type: "image", imageDataUrl: "", caption: "" }
+        : type === "code"
+        ? { id: uuidv4(), type: "code", text: "", language: "javascript" }
+        : type === "heading"
+        ? { id: uuidv4(), type: "heading", text: "Heading" }
+        : type === "bulleted"
+        ? { id: uuidv4(), type: "bulleted", text: "List item" }
+        : { id: uuidv4(), type: "text", text: "" };
+
+    updateWorkspace((draft) => {
+      const p = draft.pages[pageId];
+      if (!p) return;
+      p.blocks.push(block);
+      p.updatedAt = now();
+    });
+  }
+
+  function updateBlock(pageId: string, blockId: string, mutate: (b: Block) => void) {
+    updateWorkspace((draft) => {
+      const p = draft.pages[pageId];
+      if (!p) return;
+      const b = p.blocks.find((x) => x.id === blockId);
+      if (!b) return;
+      mutate(b);
+      p.updatedAt = now();
+    });
+  }
+
+  function removeBlock(pageId: string, blockId: string) {
+    updateWorkspace((draft) => {
+      const p = draft.pages[pageId];
+      if (!p) return;
+      p.blocks = p.blocks.filter((x) => x.id !== blockId);
+      p.updatedAt = now();
+    });
+  }
+
+  async function quickSaveFile() {
+    setSaving(true);
+    try {
+      await saveFileNative(JSON.stringify(ws, null, 2), "vibe-workspace.vibe.json");
+      setToast("Saved a .vibe.json file to your device.");
+    } catch (e: any) {
+      setToast("Save failed: " + (e?.message ?? e));
+    } finally {
+      setTimeout(() => setSaving(false), 400);
+    }
+  }
+
+  async function quickOpenFile() {
+    try {
+      const text = await openFileNative();
+      if (!text) return;
+      const parsed = JSON.parse(text);
+      if (!parsed?.pages || !parsed?.pageOrder) throw new Error("Not a Vibe workspace");
+      setWs(parsed);
+      setToast("Workspace loaded from file.");
+    } catch (e: any) {
+      setToast("Open failed: " + (e?.message ?? e));
+    }
+  }
+
+  // === Google Drive ===
+  async function initDrive() {
+    try {
+      await ensureGoogleApisLoaded();
+      // @ts-ignore
+      const gapi = window.gapi;
+      await new Promise<void>((resolve, reject) => {
+        gapi.load("client", { callback: resolve, onerror: reject });
+      });
+      await gapi.client.init({ apiKey: GOOGLE_API_KEY, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
+      setDriveReady(true);
+      setToast("Google API ready. Click Sign in.");
+    } catch (e: any) {
+      setToast("Google init failed: " + (e?.message ?? e));
+    }
+  }
+
+  async function signInGoogle() {
+    try {
+      await ensureGoogleApisLoaded();
+      // @ts-ignore
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_SCOPES,
+        callback: (resp: any) => {
+          if (resp?.access_token) {
+            setDriveToken(resp.access_token);
+            setToast("Signed in to Google Drive.");
+          } else {
+            setToast("Sign-in canceled.");
+          }
+        },
+      });
+      tokenClient.requestAccessToken();
+    } catch (e: any) {
+      setToast("Google sign-in failed: " + (e?.message ?? e));
+    }
+  }
+
+  function signOutGoogle() {
+    setDriveToken(null);
+    setToast("Signed out.");
+  }
+
+  async function driveRequest(path: string, init: RequestInit = {}) {
+    if (!driveToken) throw new Error("Not signed in");
+    const res = await fetch(`https://www.googleapis.com/drive/v3/${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${driveToken}`,
+        ...(init.headers || {}),
+      },
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res;
+  }
+
+  async function saveToDrive() {
+    try {
+      if (!driveReady) await initDrive();
+      if (!driveToken) await signInGoogle();
+      const filename = "VibeWorkspace.vibe.json";
+      // 1) check if file exists
+      const listRes = await driveRequest(
+        `files?q=name='${filename}' and trashed=false&spaces=drive&fields=files(id,name)`
+      );
+      const list = await listRes.json();
+      const fileId = list.files?.[0]?.id as string | undefined;
+
+      // 2) build multipart body
+      const meta = { name: filename, mimeType: "application/json" };
+      const boundary = "-------314159265358979323846";
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const closeDelim = `\r\n--${boundary}--`;
+      const body =
+        delimiter +
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+        JSON.stringify(meta) +
+        delimiter +
+        "Content-Type: application/json\r\n\r\n" +
+        JSON.stringify(ws) +
+        closeDelim;
+
+      if (fileId) {
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${driveToken}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`,
+          },
+          body,
+        });
+      } else {
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${driveToken}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`,
+          },
+          body,
+        });
+      }
+      setToast("Workspace saved to Google Drive.");
+    } catch (e: any) {
+      setToast("Drive save failed: " + (e?.message ?? e));
+    }
+  }
+
+  async function loadFromDrive() {
+    try {
+      if (!driveReady) await initDrive();
+      if (!driveToken) await signInGoogle();
+      const filename = "VibeWorkspace.vibe.json";
+      const listRes = await driveRequest(
+        `files?q=name='${filename}' and trashed=false&spaces=drive&fields=files(id,name,modifiedTime)`
+      );
+      const list = await listRes.json();
+      const file = list.files?.[0];
+      if (!file) throw new Error("No VibeWorkspace.vibe.json in Drive");
+      const contentRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${driveToken}` } }
+      );
+      if (!contentRes.ok) throw new Error(`${contentRes.status} ${contentRes.statusText}`);
+      const text = await contentRes.text();
+      const parsed = JSON.parse(text);
+      setWs(parsed);
+      setToast("Workspace loaded from Google Drive.");
+    } catch (e: any) {
+      setToast("Drive load failed: " + (e?.message ?? e));
+    }
+  }
+
+  // === Rendering ===
+  return (
+    <div className="h-screen w-full bg-neutral-50 text-neutral-900">
+      <TopBar
+        filter={filter}
+        setFilter={setFilter}
+        onNewPage={createPage}
+        onSaveLocal={quickSaveFile}
+        onOpenLocal={quickOpenFile}
+        saving={saving}
+        driveReady={driveReady}
+        driveToken={driveToken}
+        onInitDrive={initDrive}
+        onSignIn={signInGoogle}
+        onSignOut={signOutGoogle}
+        onSaveDrive={saveToDrive}
+        onLoadDrive={loadFromDrive}
+      />
+
+      <div className="grid grid-cols-12 h-[calc(100vh-64px)]">
+        <aside className="col-span-3 xl:col-span-2 border-r bg-white/70 backdrop-blur p-3">
+          <Sidebar
+            pages={pages}
+            filter={filter}
+            selectedId={ws.selectedPageId ?? null}
+            onSelect={setSelectedPage}
+            onDelete={deletePage}
+          />
+        </aside>
+        <main className="col-span-9 xl:col-span-10 p-4 overflow-y-auto">
+          {selectedPage ? (
+            <PageEditor
+              page={selectedPage}
+              onTitle={(t) => setPageTitle(selectedPage.id, t)}
+              onAdd={(type) => addBlock(selectedPage.id, type)}
+              onUpdate={(blockId, mutate) => updateBlock(selectedPage.id, blockId, mutate)}
+              onRemove={(blockId) => removeBlock(selectedPage.id, blockId)}
+              onSlash={(blockId) => setShowSlashMenu({ pageId: selectedPage.id, blockId })}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center text-neutral-500">
+              <p>Select or create a page to start.</p>
+            </div>
+          )}
+        </main>
+      </div>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-neutral-900 text-white px-4 py-2 rounded-xl shadow-lg"
+            onAnimationComplete={() => setTimeout(() => setToast(null), 2400)}
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <SlashMenu
+        open={!!showSlashMenu}
+        onClose={() => setShowSlashMenu(null)}
+        onPick={(type) => {
+          if (showSlashMenu) {
+            updateBlock(showSlashMenu.pageId, showSlashMenu.blockId, (b) => {
+              // transform block type
+              if (type === "todo") {
+                const text = (b as any).text ?? "";
+                (b as any).type = "todo";
+                (b as any).text = text;
+                (b as any).checked = false;
+              } else if (type === "image") {
+                (b as any).type = "image";
+                (b as any).imageDataUrl = "";
+              } else if (type === "code") {
+                const text = (b as any).text ?? "";
+                (b as any).type = "code";
+                (b as any).text = text;
+                (b as any).language = "javascript";
+              } else {
+                const text = (b as any).text ?? "";
+                (b as any).type = type;
+                (b as any).text = text;
+                delete (b as any).checked;
+                delete (b as any).imageDataUrl;
+              }
+            });
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+function TopBar(props: {
+  filter: string;
+  setFilter: (v: string) => void;
+  onNewPage: () => void;
+  onSaveLocal: () => void;
+  onOpenLocal: () => void;
+  saving: boolean;
+  driveReady: boolean;
+  driveToken: string | null;
+  onInitDrive: () => void;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onSaveDrive: () => void;
+  onLoadDrive: () => void;
+}) {
+  return (
+    <div className="h-16 px-3 flex items-center justify-between border-b bg-white/70 backdrop-blur sticky top-0 z-10">
+      <div className="flex items-center gap-2">
+        <Badge className="rounded-2xl px-3 py-1">Vibe</Badge>
+        <Button className="rounded-2xl" variant="secondary" size="sm" onClick={props.onNewPage}>
+          <Plus className="h-4 w-4 mr-1" /> New Page
+        </Button>
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-neutral-400" />
+          <Input
+            className="pl-8 w-64"
+            placeholder="Search pages"
+            value={props.filter}
+            onChange={(e) => props.setFilter(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={props.onOpenLocal}>
+          <FolderOpen className="h-4 w-4 mr-1" /> Open File
+        </Button>
+        <Button variant="default" size="sm" onClick={props.onSaveLocal} disabled={props.saving}>
+          <Save className="h-4 w-4 mr-1" /> {props.saving ? "Saving…" : "Save File"}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <CloudUpload className="h-4 w-4 mr-1" /> Drive
+              <MoreVertical className="h-4 w-4 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={props.onInitDrive}>Initialize API</DropdownMenuItem>
+            {props.driveToken ? (
+              <DropdownMenuItem onClick={props.onSignOut}>
+                <LogOut className="h-4 w-4 mr-2" /> Sign out
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={props.onSignIn}>
+                <LogIn className="h-4 w-4 mr-2" /> Sign in
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={props.onSaveDrive}>
+              <CloudUpload className="h-4 w-4 mr-2" /> Save to Drive
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={props.onLoadDrive}>
+              <CloudDownload className="h-4 w-4 mr-2" /> Load from Drive
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar(props: {
+  pages: Page[];
+  selectedId: string | null;
+  filter: string;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const filtered = props.filter
+    ? props.pages.filter((p) => p.title.toLowerCase().includes(props.filter.toLowerCase()))
+    : props.pages;
+
+  return (
+    <ScrollArea className="h-full pr-2">
+      <div className="flex flex-col gap-2">
+        {filtered.length === 0 && (
+          <div className="text-sm text-neutral-500 p-2">No pages match your search.</div>
+        )}
+        {filtered.map((p) => (
+          <Card
+            key={p.id}
+            className={`rounded-2xl cursor-pointer border ${
+              props.selectedId === p.id ? "border-neutral-900" : "border-neutral-200"
+            }`}
+            onClick={() => props.onSelect(p.id)}
+          >
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="font-medium truncate max-w-[10rem]">{p.title || "Untitled"}</div>
+                  <div className="text-xs text-neutral-500">
+                    {new Date(p.updatedAt).toLocaleString()}
+                  </div>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onDelete(p.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </ScrollArea>
+  );
+}
+
+function PageEditor(props: {
+  page: Page;
+  onTitle: (title: string) => void;
+  onAdd: (type: BlockType) => void;
+  onUpdate: (blockId: string, mutate: (b: Block) => void) => void;
+  onRemove: (blockId: string) => void;
+  onSlash: (blockId: string) => void;
+}) {
+  const { page } = props;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <Input
+        value={page.title}
+        onChange={(e) => props.onTitle(e.target.value)}
+        className="h-12 text-2xl md:text-3xl font-semibold border-none focus-visible:ring-0 px-0 bg-transparent"
+      />
+
+      <div className="mt-4 flex flex-col gap-2">
+        {page.blocks.map((b) => (
+          <BlockView
+            key={b.id}
+            block={b}
+            onChange={(mut) => props.onUpdate(b.id, mut)}
+            onRemove={() => props.onRemove(b.id)}
+            onSlash={() => props.onSlash(b.id)}
+            onPickImage={() => fileInputRef.current?.click()}
+          />
+        ))}
+        <div className="pt-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="rounded-2xl" variant="secondary" size="sm">
+                <Plus className="h-4 w-4 mr-1" /> Add block
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => props.onAdd("text")}>
+                <Type className="h-4 w-4 mr-2" /> Text
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => props.onAdd("heading")}>
+                <Heading className="h-4 w-4 mr-2" /> Heading
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => props.onAdd("todo")}>
+                <CheckSquare className="h-4 w-4 mr-2" /> Todo
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => props.onAdd("bulleted")}>
+                <List className="h-4 w-4 mr-2" /> Bulleted
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => props.onAdd("code")}>
+                <Code className="h-4 w-4 mr-2" /> Code
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => props.onAdd("image")}>
+                <ImageIcon className="h-4 w-4 mr-2" /> Image
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = String(reader.result);
+            // find last image block without data and fill it
+            const lastImg = [...page.blocks].reverse().find((b) => b.type === "image" && !(b as ImageBlock).imageDataUrl) as ImageBlock | undefined;
+            if (lastImg) {
+              props.onUpdate(lastImg.id, (blk) => {
+                (blk as ImageBlock).imageDataUrl = dataUrl;
+              });
+            }
+          };
+          reader.readAsDataURL(file);
+          e.currentTarget.value = ""; // reset picker
+        }}
+      />
+    </div>
+  );
+}
+
+function BlockView(props: {
+  block: Block;
+  onChange: (mutate: (b: Block) => void) => void;
+  onRemove: () => void;
+  onSlash: () => void;
+  onPickImage: () => void;
+}) {
+  const { block } = props;
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement | HTMLDivElement>) {
+    if (e.key === "/") {
+      e.preventDefault();
+      props.onSlash();
+    }
+  }
+
+  if (block.type === "heading") {
+    return (
+      <div className="flex items-start gap-2 group">
+        <Textarea
+          className="min-h-0 h-auto text-xl md:text-2xl font-semibold resize-none border-none focus-visible:ring-0 p-0 bg-transparent"
+          value={(block as TextBlock).text}
+          onChange={(e) => props.onChange((b) => ((b as TextBlock).text = e.target.value))}
+          onKeyDown={onKeyDown}
+        />
+        <BlockActions onRemove={props.onRemove} />
+      </div>
+    );
+  }
+
+  if (block.type === "text" || block.type === "bulleted") {
+    return (
+      <div className="flex items-start gap-2 group">
+        {block.type === "bulleted" && <div className="mt-2 ml-1 w-2 h-2 rounded-full bg-neutral-300" />}
+        <Textarea
+          className="min-h-0 h-auto resize-none border-none focus-visible:ring-0 p-0 bg-transparent"
+          value={(block as TextBlock).text}
+          onChange={(e) => props.onChange((b) => ((b as TextBlock).text = e.target.value))}
+          onKeyDown={onKeyDown}
+        />
+        <BlockActions onRemove={props.onRemove} />
+      </div>
+    );
+  }
+
+  if (block.type === "todo") {
+    const todo = block as TodoBlock;
+    return (
+      <div className="flex items-start gap-2 group">
+        <input
+          type="checkbox"
+          className="mt-2 h-4 w-4"
+          checked={todo.checked}
+          onChange={(e) => props.onChange((b) => ((b as TodoBlock).checked = e.target.checked))}
+        />
+        <Textarea
+          className={`min-h-0 h-auto resize-none border-none focus-visible:ring-0 p-0 bg-transparent ${
+            todo.checked ? "line-through text-neutral-400" : ""
+          }`}
+          value={todo.text}
+          onChange={(e) => props.onChange((b) => ((b as TodoBlock).text = e.target.value))}
+          onKeyDown={onKeyDown}
+        />
+        <BlockActions onRemove={props.onRemove} />
+      </div>
+    );
+  }
+
+  if (block.type === "code") {
+    const code = block as TextBlock;
+    return (
+      <div className="group">
+        <div className="flex items-center justify-between">
+          <Badge className="rounded-xl">{code.language || "code"}</Badge>
+          <BlockActions onRemove={props.onRemove} />
+        </div>
+        <Textarea
+          className="mt-2 font-mono text-sm bg-neutral-100 rounded-xl p-3"
+          value={code.text}
+          onChange={(e) => props.onChange((b) => ((b as TextBlock).text = e.target.value))}
+          onKeyDown={onKeyDown}
+        />
+      </div>
+    );
+  }
+
+  if (block.type === "image") {
+    const img = block as ImageBlock;
+    return (
+      <div className="group">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm text-neutral-500">Image</div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={props.onPickImage}>
+              <ImageIcon className="h-4 w-4 mr-1" /> Choose…
+            </Button>
+            <BlockActions onRemove={props.onRemove} />
+          </div>
+        </div>
+        {img.imageDataUrl ? (
+          <img src={img.imageDataUrl} alt={img.caption || "image"} className="rounded-2xl w-full" />
+        ) : (
+          <div className="border-2 border-dashed rounded-2xl p-6 text-center text-neutral-400">
+            Click “Choose…” to attach an image
+          </div>
+        )}
+        <Input
+          className="mt-2"
+          placeholder="Caption (optional)"
+          value={img.caption || ""}
+          onChange={(e) => props.onChange((b) => ((b as ImageBlock).caption = e.target.value))}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function BlockActions({ onRemove }: { onRemove: () => void }) {
+  return (
+    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+      <Button size="icon" variant="ghost" onClick={onRemove}>
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+function SlashMenu(props: { open: boolean; onClose: () => void; onPick: (t: BlockType) => void }) {
+  const items: { k: BlockType; title: string; icon: React.ReactNode; hint: string }[] = [
+    { k: "text", title: "Text", icon: <Type className="h-4 w-4" />, hint: "Plain paragraph" },
+    { k: "heading", title: "Heading", icon: <Heading className="h-4 w-4" />, hint: "Big title" },
+    { k: "todo", title: "To‑do", icon: <CheckSquare className="h-4 w-4" />, hint: "Checkbox" },
+    { k: "bulleted", title: "Bulleted", icon: <List className="h-4 w-4" />, hint: "• list" },
+    { k: "code", title: "Code", icon: <Code className="h-4 w-4" />, hint: "Monospace" },
+    { k: "image", title: "Image", icon: <ImageIcon className="h-4 w-4" />, hint: "Upload" },
+  ];
+
+  return (
+    <AnimatePresence>
+      {props.open && (
+        <motion.div
+          className="fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={props.onClose}
+        >
+          <div className="absolute left-1/2 top-1/3 -translate-x-1/2 bg-white rounded-2xl shadow-2xl border w-[28rem]">
+            <div className="p-3 border-b font-medium">Change block type</div>
+            <div className="p-2">
+              {items.map((it) => (
+                <button
+                  key={it.k}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-neutral-50 flex items-center gap-3"
+                  onClick={() => {
+                    props.onPick(it.k);
+                    props.onClose();
+                  }}
+                >
+                  <div className="p-2 rounded-xl bg-neutral-100">{it.icon}</div>
+                  <div>
+                    <div className="font-medium">{it.title}</div>
+                    <div className="text-xs text-neutral-500">{it.hint}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
