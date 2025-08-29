@@ -1,1 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteFlow - Your Personal Workspace</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7f7f5;
+            --bg-hover: #efefef;
+            --text-primary: #37352f;
+            --text-secondary: #787774;
+            --border: #e0e0e0;
+            --accent: #0084ff;
+            --sidebar-width: 260px;
+            --editor-bg: #ffffff;
+            --code-bg: #f7f7f5;
+        }
+
+        /* Predefined Themes */
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --bg-hover: #3a3a3a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border: #404040;
+            --accent: #4a9eff;
+            --editor-bg: #1e1e1e;
+            --code-bg: #2d2d2d;
+        }
+
+        [data-theme="sepia"] {
+            --bg-primary: #f4ecd8;
+            --bg-secondary: #ede0c8;
+            --bg-hover: #e6d4b1;
+            --text-primary: #5c4b37;
+            --text-secondary: #8b7355;
+            --border: #d4c4a8;
+            --accent: #b8860b;
+            --editor-bg: #f4ecd8;
+            --code-bg: #ede0c8;
+        }
+
+        [data-theme="forest"] {
+            --bg-primary: #1a2f1a;
+            --bg-secondary: #243524;
+            --bg-hover: #2e422e;
+            --text-primary: #c9d4c9;
+            --text-secondary: #8fa68f;
+            --border: #3a4f3a;
+            --accent: #4caf50;
+            --editor-bg: #1a2f1a;
+            --code-bg: #243524;
+        }
+
+        [data-theme="ocean"] {
+            --bg-primary: #0a1929;
+            --bg-secondary: #132337;
+            --bg-hover: #1c2f45;
+            --text-primary: #b8cfe5;
+            --text-secondary: #7a92aa;
+            --border: #2a3f56;
+            --accent: #00bcd4;
+            --editor-bg: #0a1929;
+            --code-bg: #132337;
+        }
+
+        [data-theme="sunset"] {
+            --bg-primary: #2b1b3d;
+            --bg-secondary: #3a2750;
+            --bg-hover: #4a3460;
+            --text-primary: #f4b8c2;
+            --text-secondary: #c08a96;
+            --border: #4a3460;
+            --accent: #ff6b9d;
+            --editor-bg: #2b1b3d;
+            --code-bg: #3a2750;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Theme Switcher Button */
+        .theme-switcher-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+
+        .theme-switcher-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Theme Panel */
+        .theme-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 200;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .theme-panel.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .theme-panel-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .theme-panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .apply-mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .page-selector {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .page-selector.active {
+            display: block;
+        }
+
+        .page-selector-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+        }
+
+        .page-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .page-checkbox:hover {
+            background: var(--bg-hover);
+        }
+
+        .page-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .theme-presets {
+            margin-bottom: 20px;
+        }
+
+        .preset-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .preset-card {
+            padding: 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .preset-card.active {
+            border-color: var(--accent);
+        }
+
+        .preset-card.active::after {
+            content: '✓';
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: var(--accent);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .preset-preview {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 8px;
+            height: 30px;
+        }
+
+        .preset-color {
+            flex: 1;
+            border-radius: 4px;
+        }
+
+        .preset-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .custom-colors {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .color-input-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .color-input-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-input-item label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex: 1;
+        }
+
+        .color-input-item input[type="color"] {
+            width: 40px;
+            height: 30px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .theme-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .reset-theme-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .reset-theme-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease, background-color 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            margin-left: calc(-1 * var(--sidebar-width));
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .workspace-name {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .page-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2px;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .page-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .page-item.active {
+            background: var(--bg-hover);
+        }
+
+        .page-item i {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .page-theme-indicator {
+            position: absolute;
+            right: 35px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+        }
+
+        .add-page-btn {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .add-page-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--editor-bg);
+            transition: background-color 0.3s ease;
+        }
+
+        .toolbar {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--bg-primary);
+            transition: background-color 0.3s ease;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .toolbar-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+
+        /* Editor Area */
+        .editor-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .page-title {
+            font-size: 40px;
+            font-weight: 700;
+            border: none;
+            outline: none;
+            width: 100%;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            background: transparent;
+        }
+
+        .editor {
+            min-height: 500px;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.8;
+            color: var(--text-primary);
+        }
+
+        .editor h1 {
+            font-size: 32px;
+            margin: 20px 0;
+        }
+
+        .editor h2 {
+            font-size: 24px;
+            margin: 18px 0;
+        }
+
+        .editor h3 {
+            font-size: 20px;
+            margin: 16px 0;
+        }
+
+        .editor p {
+            margin: 12px 0;
+        }
+
+        .editor ul, .editor ol {
+            margin: 12px 0;
+            padding-left: 30px;
+        }
+
+        .editor blockquote {
+            border-left: 3px solid var(--text-secondary);
+            padding-left: 20px;
+            margin: 15px 0;
+            color: var(--text-secondary);
+        }
+
+        .editor pre {
+            background: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .editor code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .modal-input:focus {
+            border-color: var(--accent);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Storage Options */
+        .storage-options {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            max-width: 500px;
+        }
+
+        .storage-btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+
+        .storage-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Toggle Button */
+        .toggle-sidebar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .toggle-sidebar {
+                display: block;
+            }
+            
+            .sidebar {
+                position: fixed;
+                z-index: 99;
+                height: 100vh;
+            }
+            
+            .editor-container {
+                padding: 20px;
+            }
+
+            .storage-options {
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                justify-content: center;
+            }
+
+            .theme-panel {
+                width: calc(100% - 40px);
+                right: 20px;
+                left: 20px;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid var(--bg-hover);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 2000;
+            animation: slideUp 0.3s ease;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="workspace-name">
+                    <i class="fas fa-cube"></i>
+                    <span>My Workspace</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        <span>Pages</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div id="pagesList"></div>
+                    <button class="add-page-btn" onclick="createNewPage()">
+                        <i class="fas fa-plus"></i>
+                        <span>Add a page</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <button class="toolbar-btn" onclick="formatText('bold')">
+                    <i class="fas fa-bold"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatText('italic')">
+                    <i class="fas fa-italic"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatText('underline')">
+                    <i class="fas fa-underline"></i>
+                </button>
+                
+                <div class="toolbar-separator"></div>
+                
+                <button class="toolbar-btn" onclick="formatBlock('h1')">
+                    H1
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('h2')">
+                    H2
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('h3')">
+                    H3
+                </button>
+                
+                <div class="toolbar-separator"></div>
+                
+                <button class="toolbar-btn" onclick="formatText('insertUnorderedList')">
+                    <i class="fas fa-list-ul"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatText('insertOrderedList')">
+                    <i class="fas fa-list-ol"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('blockquote')">
+                    <i class="fas fa-quote-left"></i>
+                </button>
+                
+                <div class="toolbar-separator"></div>
+                
+                <button class="toolbar-btn" onclick="insertLink()">
+                    <i class="fas fa-link"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('pre')">
+                    <i class="fas fa-code"></i>
+                </button>
+            </div>
+
+            <!-- Editor -->
+            <div class="editor-container">
+                <input type="text" class="page-title" id="pageTitle" placeholder="Untitled" />
+                <div class="editor" id="editor" contenteditable="true" placeholder="Start typing..."></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Switcher Button -->
+    <button class="theme-switcher-btn" onclick="toggleThemePanel()">
+        <i class="fas fa-palette"></i>
+    </button>
+
+    <!-- Theme Panel -->
+    <div class="theme-panel" id="themePanel">
+        <div class="theme-panel-header">
+            <h3 class="theme-panel-title">🎨 Theme Settings</h3>
+            
+            <div class="apply-mode-toggle">
+                <button class="mode-btn active" onclick="setApplyMode('current')">
+                    Current Page Only
+                </button>
+                <button class="mode-btn" onclick="setApplyMode('all')">
+                    All Pages
+                </button>
+                <button class="mode-btn" onclick="setApplyMode('custom')">
+                    Select Pages
+                </button>
+            </div>
+
+            <div class="page-selector" id="pageSelector">
+                <div class="page-selector-title">Select pages to apply theme:</div>
+                <div id="pageSelectorList"></div>
+            </div>
+        </div>
+
+        <div class="theme-presets">
+            <div class="preset-title">Preset Themes</div>
+            <div class="preset-grid">
+                <div class="preset-card active" onclick="applyPresetTheme('default')" data-theme="default">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #ffffff"></div>
+                        <div class="preset-color" style="background: #f7f7f5"></div>
+                        <div class="preset-color" style="background: #0084ff"></div>
+                    </div>
+                    <div class="preset-name">Default</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('dark')" data-theme="dark">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #1e1e1e"></div>
+                        <div class="preset-color" style="background: #2d2d2d"></div>
+                        <div class="preset-color" style="background: #4a9eff"></div>
+                    </div>
+                    <div class="preset-name">Dark</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('sepia')" data-theme="sepia">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #f4ecd8"></div>
+                        <div class="preset-color" style="background: #ede0c8"></div>
+                        <div class="preset-color" style="background: #b8860b"></div>
+                    </div>
+                    <div class="preset-name">Sepia</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('forest')" data-theme="forest">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #1a2f1a"></div>
+                        <div class="preset-color" style="background: #243524"></div>
+                        <div class="preset-color" style="background: #4caf50"></div>
+                    </div>
+                    <div class="preset-name">Forest</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('ocean')" data-theme="ocean">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #0a1929"></div>
+                        <div class="preset-color" style="background: #132337"></div>
+                        <div class="preset-color" style="background: #00bcd4"></div>
+                    </div>
+                    <div class="preset-name">Ocean</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('sunset')" data-theme="sunset">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #2b1b3d"></div>
+                        <div class="preset-color" style="background: #3a2750"></div>
+                        <div class="preset-color" style="background: #ff6b9d"></div>
+                    </div>
+                    <div class="preset-name">Sunset</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="custom-colors">
+            <div class="preset-title">Custom Colors</div>
+            <div class="color-input-group">
+                <div class="color-input-item">
+                    <label>Background</label>
+                    <input type="color" id="customBgPrimary" onchange="applyCustomColors()">
+                </div>
+                <div class="color-input-item">
+                    <label>Secondary</label>
+                    <input type="color" id="customBgSecondary" onchange="applyCustomColors()">
+                </div>
+                <div class="color-input-item">
+                    <label>Text</label>
+                    <input type="color" id="customTextPrimary" onchange="applyCustomColors()">
+                </div>
+                <div class="color-input-item">
+                    <label>Accent</label>
+                    <input type="color" id="customAccent" onchange="applyCustomColors()">
+                </div>
+            </div>
+        </div>
+
+        <div class="theme-actions">
+            <button class="reset-theme-btn" onclick="resetTheme()">
+                <i class="fas fa-undo"></i> Reset to Default
+            </button>
+        </div>
+    </div>
+
+    <!-- Toggle Sidebar Button -->
+    <button class="toggle-sidebar" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Storage Options -->
+    <div class="storage-options">
+        <button class="storage-btn" onclick="saveToLocal()">
+            <i class="fas fa-save"></i>
+            Save Locally
+        </button>
+        <button class="storage-btn" onclick="exportToFile()">
+            <i class="fas fa-download"></i>
+            Export
+        </button>
+        <button class="storage-btn" onclick="importFromFile()">
+            <i class="fas fa-upload"></i>
+            Import
+        </button>
+        <button class="storage-btn" onclick="saveToGoogleDrive()">
+            <i class="fab fa-google-drive"></i>
+            Save to Drive
+        </button>
+    </div>
+
+    <!-- Modal for new page -->
+    <div class="modal" id="newPageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Page</h3>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="modal-input" id="newPageName" placeholder="Enter page name..." />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('newPageModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmNewPage()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="fileInput" style="display: none;" accept=".json,.txt,.html" />
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Google Drive API Configuration
+        const CLIENT_ID = 'YOUR_CLIENT_ID'; // Replace with your Google Client ID
+        const API_KEY = 'YOUR_API_KEY'; // Replace with your Google API Key
+        const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        // Application State
+        let pages = [];
+        let currentPageId = null;
+        let isGoogleSignedIn = false;
+        let themeApplyMode = 'current'; // 'current', 'all', 'custom'
+        let selectedPagesForTheme = [];
+        let globalTheme = 'default';
+
+        // Theme configurations
+        const themes = {
+            default: {
+                name: 'Default',
+                bgPrimary: '#ffffff',
+                bgSecondary: '#f7f7f5',
+                bgHover: '#efefef',
+                textPrimary: '#37352f',
+                textSecondary: '#787774',
+                border: '#e0e0e0',
+                accent: '#0084ff',
+                editorBg: '#ffffff',
+                codeBg: '#f7f7f5'
+            },
+            dark: {
+                name: 'Dark',
+                bgPrimary: '#1e1e1e',
+                bgSecondary: '#2d2d2d',
+                bgHover: '#3a3a3a',
+                textPrimary: '#e0e0e0',
+                textSecondary: '#a0a0a0',
+                border: '#404040',
+                accent: '#4a9eff',
+                editorBg: '#1e1e1e',
+                codeBg: '#2d2d2d'
+            },
+            sepia: {
+                name: 'Sepia',
+                bgPrimary: '#f4ecd8',
+                bgSecondary: '#ede0c8',
+                bgHover: '#e6d4b1',
+                textPrimary: '#5c4b37',
+                textSecondary: '#8b7355',
+                border: '#d4c4a8',
+                accent: '#b8860b',
+                editorBg: '#f4ecd8',
+                codeBg: '#ede0c8'
+            },
+            forest: {
+                name: 'Forest',
+                bgPrimary: '#1a2f1a',
+                bgSecondary: '#243524',
+                bgHover: '#2e422e',
+                textPrimary: '#c9d4c9',
+                textSecondary: '#8fa68f',
+                border: '#3a4f3a',
+                accent: '#4caf50',
+                editorBg: '#1a2f1a',
+                codeBg: '#243524'
+            },
+            ocean: {
+                name: 'Ocean',
+                bgPrimary: '#0a1929',
+                bgSecondary: '#132337',
+                bgHover: '#1c2f45',
+                textPrimary: '#b8cfe5',
+                textSecondary: '#7a92aa',
+                border: '#2a3f56',
+                accent: '#00bcd4',
+                editorBg: '#0a1929',
+                codeBg: '#132337'
+            },
+            sunset: {
+                name: 'Sunset',
+                bgPrimary: '#2b1b3d',
+                bgSecondary: '#3a2750',
+                bgHover: '#4a3460',
+                textPrimary: '#f4b8c2',
+                textSecondary: '#c08a96',
+                border: '#4a3460',
+                accent: '#ff6b9d',
+                editorBg: '#2b1b3d',
+                codeBg: '#3a2750'
+            }
+        };
+
+        // Initialize the app
+        function initApp() {
+            loadPagesFromLocal();
+            loadThemeSettings();
+            
+            if (pages.length === 0) {
+                createDefaultPage();
+            } else {
+                loadPage(pages[0].id);
+            }
+            renderPagesList();
+            
+            // Auto-save every 30 seconds
+            setInterval(autoSave, 30000);
+            
+            // Save on input
+            document.getElementById('pageTitle').addEventListener('input', debounce(savePage, 1000));
+            document.getElementById('editor').addEventListener('input', debounce(savePage, 1000));
+        }
+
+        // Theme Management Functions
+        function toggleThemePanel() {
+            const panel = document.getElementById('themePanel');
+            panel.classList.toggle('active');
+            
+            if (panel.classList.contains('active')) {
+                updatePageSelectorList();
+            }
+        }
+
+        function setApplyMode(mode) {
+            themeApplyMode = mode;
+            
+            // Update button states
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show/hide page selector
+            const selector = document.getElementById('pageSelector');
+            if (mode === 'custom') {
+                selector.classList.add('active');
+                updatePageSelectorList();
+            } else {
+                selector.classList.remove('active');
+            }
+        }
+
+        function updatePageSelectorList() {
+            const list = document.getElementById('pageSelectorList');
+            list.innerHTML = '';
+            
+            pages.forEach(page => {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'page-checkbox';
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="theme-page-${page.id}" 
+                           ${selectedPagesForTheme.includes(page.id) ? 'checked' : ''}>
+                    <label for="theme-page-${page.id}" style="cursor: pointer; flex: 1;">
+                        ${page.title}
+                    </label>
+                `;
+                
+                checkbox.querySelector('input').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        selectedPagesForTheme.push(page.id);
+                    } else {
+                        selectedPagesForTheme = selectedPagesForTheme.filter(id => id !== page.id);
+                    }
+                });
+                
+                list.appendChild(checkbox);
+            });
+        }
+
+        function applyPresetTheme(themeName) {
+            // Update active state
+            document.querySelectorAll('.preset-card').forEach(card => {
+                card.classList.remove('active');
+                if (card.dataset.theme === themeName) {
+                    card.classList.add('active');
+                }
+            });
+            
+            // Apply theme based on mode
+            if (themeApplyMode === 'all') {
+                // Apply to all pages
+                globalTheme = themeName;
+                pages.forEach(page => {
+                    page.theme = themeName;
+                });
+                document.body.setAttribute('data-theme', themeName);
+            } else if (themeApplyMode === 'current') {
+                // Apply to current page only
+                const page = pages.find(p => p.id === currentPageId);
+                if (page) {
+                    page.theme = themeName;
+                }
+                document.body.setAttribute('data-theme', themeName);
+            } else if (themeApplyMode === 'custom') {
+                // Apply to selected pages
+                selectedPagesForTheme.forEach(pageId => {
+                    const page = pages.find(p => p.id === pageId);
+                    if (page) {
+                        page.theme = themeName;
+                    }
+                });
+                // Apply to current page if it's in the selected list
+                if (selectedPagesForTheme.includes(currentPageId)) {
+                    document.body.setAttribute('data-theme', themeName);
+                }
+            }
+            
+            savePagesToLocal();
+            saveThemeSettings();
+            renderPagesList();
+            showToast(`Theme applied: ${themes[themeName].name}`);
+        }
+
+        function applyCustomColors() {
+            const customTheme = {
+                bgPrimary: document.getElementById('customBgPrimary').value,
+                bgSecondary: document.getElementById('customBgSecondary').value,
+                textPrimary: document.getElementById('customTextPrimary').value,
+                accent: document.getElementById('customAccent').value
+            };
+            
+            // Apply custom colors as CSS variables
+            const root = document.documentElement;
+            root.style.setProperty('--bg-primary', customTheme.bgPrimary);
+            root.style.setProperty('--bg-secondary', customTheme.bgSecondary);
+            root.style.setProperty('--text-primary', customTheme.textPrimary);
+            root.style.setProperty('--accent', customTheme.accent);
+            
+            // Save custom theme
+            if (themeApplyMode === 'all') {
+                pages.forEach(page => {
+                    page.customTheme = customTheme;
+                    page.theme = 'custom';
+                });
+            } else if (themeApplyMode === 'current') {
+                const page = pages.find(p => p.id === currentPageId);
+                if (page) {
+                    page.customTheme = customTheme;
+                    page.theme = 'custom';
+                }
+            } else if (themeApplyMode === 'custom') {
+                selectedPagesForTheme.forEach(pageId => {
+                    const page = pages.find(p => p.id === pageId);
+                    if (page) {
+                        page.customTheme = customTheme;
+                        page.theme = 'custom';
+                    }
+                });
+            }
+            
+            savePagesToLocal();
+            saveThemeSettings();
+            showToast('Custom colors applied!');
+        }
+
+        function resetTheme() {
+            if (themeApplyMode === 'all') {
+                pages.forEach(page => {
+                    page.theme = 'default';
+                    delete page.customTheme;
+                });
+                globalTheme = 'default';
+            } else if (themeApplyMode === 'current') {
+                const page = pages.find(p => p.id === currentPageId);
+                if (page) {
+                    page.theme = 'default';
+                    delete page.customTheme;
+                }
+            } else if (themeApplyMode === 'custom') {
+                selectedPagesForTheme.forEach(pageId => {
+                    const page = pages.find(p => p.id === pageId);
+                    if (page) {
+                        page.theme = 'default';
+                        delete page.customTheme;
+                    }
+                });
+            }
+            
+            document.body.setAttribute('data-theme', 'default');
+            document.documentElement.style = '';
+            
+            savePagesToLocal();
+            saveThemeSettings();
+            renderPagesList();
+            showToast('Theme reset to default!');
+        }
+
+        function loadPageTheme(pageId) {
+            const page = pages.find(p => p.id === pageId);
+            if (page && page.theme) {
+                if (page.theme === 'custom' && page.customTheme) {
+                    // Apply custom theme
+                    const root = document.documentElement;
+                    root.style.setProperty('--bg-primary', page.customTheme.bgPrimary);
+                    root.style.setProperty('--bg-secondary', page.customTheme.bgSecondary);
+                    root.style.setProperty('--text-primary', page.customTheme.textPrimary);
+                    root.style.setProperty('--accent', page.customTheme.accent);
+                    document.body.removeAttribute('data-theme');
+                } else {
+                    // Apply preset theme
+                    document.body.setAttribute('data-theme', page.theme);
+                    document.documentElement.style = '';
+                }
+            } else {
+                // Use global theme or default
+                document.body.setAttribute('data-theme', globalTheme);
+                document.documentElement.style = '';
+            }
+        }
+
+        function saveThemeSettings() {
+            localStorage.setItem('noteflow_theme_settings', JSON.stringify({
+                globalTheme: globalTheme,
+                selectedPagesForTheme: selectedPagesForTheme
+            }));
+        }
+
+        function loadThemeSettings() {
+            const settings = localStorage.getItem('noteflow_theme_settings');
+            if (settings) {
+                const parsed = JSON.parse(settings);
+                globalTheme = parsed.globalTheme || 'default';
+                selectedPagesForTheme = parsed.selectedPagesForTheme || [];
+            }
+        }
+
+        // Create default page
+        function createDefaultPage() {
+            const defaultPage = {
+                id: generateId(),
+                title: 'Welcome to NoteFlow',
+                content: '<h2>Welcome to NoteFlow! 🎉</h2><p>This is your personal workspace where you can:</p><ul><li>Create and organize pages</li><li>Format text with rich editing tools</li><li>Apply custom themes to individual pages or all pages</li><li>Save your work locally</li><li>Export and import your documents</li><li>Sync with Google Drive</li></ul><p>Start by creating a new page or editing this one!</p>',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                theme: 'default'
+            };
+            pages.push(defaultPage);
+            currentPageId = defaultPage.id;
+            savePagesToLocal();
+        }
+
+        // Generate unique ID
+        function generateId() {
+            return '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Page Management
+        function createNewPage() {
+            document.getElementById('newPageModal').classList.add('active');
+            document.getElementById('newPageName').focus();
+        }
+
+        function confirmNewPage() {
+            const name = document.getElementById('newPageName').value.trim();
+            if (name) {
+                const newPage = {
+                    id: generateId(),
+                    title: name,
+                    content: '',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    theme: globalTheme
+                };
+                pages.push(newPage);
+                savePagesToLocal();
+                renderPagesList();
+                loadPage(newPage.id);
+                closeModal('newPageModal');
+                showToast('Page created successfully!');
+            }
+        }
+
+        function loadPage(pageId) {
+            savePage(); // Save current page before switching
+            
+            const page = pages.find(p => p.id === pageId);
+            if (page) {
+                currentPageId = pageId;
+                document.getElementById('pageTitle').value = page.title;
+                document.getElementById('editor').innerHTML = page.content;
+                
+                // Load page theme
+                loadPageTheme(pageId);
+                
+                // Update active state in sidebar
+                document.querySelectorAll('.page-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (item.dataset.pageId === pageId) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+        }
+
+        function savePage() {
+            if (!currentPageId) return;
+            
+            const page = pages.find(p => p.id === currentPageId);
+            if (page) {
+                page.title = document.getElementById('pageTitle').value || 'Untitled';
+                page.content = document.getElementById('editor').innerHTML;
+                page.updatedAt = new Date().toISOString();
+                savePagesToLocal();
+            }
+        }
+
+        function deletePage(pageId) {
+            if (confirm('Are you sure you want to delete this page?')) {
+                pages = pages.filter(p => p.id !== pageId);
+                savePagesToLocal();
+                
+                if (currentPageId === pageId) {
+                    if (pages.length > 0) {
+                        loadPage(pages[0].id);
+                    } else {
+                        createDefaultPage();
+                    }
+                }
+                
+                renderPagesList();
+                showToast('Page deleted successfully!');
+            }
+        }
+
+        // Render pages list in sidebar
+        function renderPagesList() {
+            const pagesList = document.getElementById('pagesList');
+            pagesList.innerHTML = '';
+            
+            pages.forEach(page => {
+                const pageItem = document.createElement('div');
+                pageItem.className = 'page-item';
+                pageItem.dataset.pageId = page.id;
+                if (page.id === currentPageId) {
+                    pageItem.classList.add('active');
+                }
+                
+                // Get theme color for indicator
+                let themeColor = '#0084ff';
+                if (page.theme && page.theme !== 'default') {
+                    if (page.theme === 'custom' && page.customTheme) {
+                        themeColor = page.customTheme.accent;
+                    } else if (themes[page.theme]) {
+                        themeColor = themes[page.theme].accent;
+                    }
+                }
+                
+                pageItem.innerHTML = `
+                    <i class="fas fa-file-alt"></i>
+                    <span style="flex: 1;">${page.title}</span>
+                    ${page.theme && page.theme !== 'default' ? 
+                        `<div class="page-theme-indicator" style="background: ${themeColor};" title="Custom theme applied"></div>` : ''}
+                    <i class="fas fa-trash" onclick="event.stopPropagation(); deletePage('${page.id}')" style="opacity: 0.5;"></i>
+                `;
+                
+                pageItem.onclick = () => loadPage(page.id);
+                pagesList.appendChild(pageItem);
+            });
+        }
+
+        // Local Storage Functions
+        function savePagesToLocal() {
+            localStorage.setItem('noteflow_pages', JSON.stringify(pages));
+        }
+
+        function loadPagesFromLocal() {
+            const stored = localStorage.getItem('noteflow_pages');
+            if (stored) {
+                pages = JSON.parse(stored);
+            }
+        }
+
+        function saveToLocal() {
+            savePage();
+            savePagesToLocal();
+            showToast('Saved to local storage!');
+        }
+
+        function autoSave() {
+            savePage();
+            savePagesToLocal();
+        }
+
+        // Export/Import Functions
+        function exportToFile() {
+            savePage();
+            const dataStr = JSON.stringify({
+                pages: pages,
+                globalTheme: globalTheme,
+                exportedAt: new Date().toISOString(),
+                version: '1.1'
+            }, null, 2);
+            
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileDefaultName = `noteflow_export_${new Date().toISOString().split('T')[0]}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showToast('Exported successfully!');
+        }
+
+        function importFromFile() {
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.pages) {
+                            pages = data.pages;
+                            if (data.globalTheme) {
+                                globalTheme = data.globalTheme;
+                            }
+                            savePagesToLocal();
+                            saveThemeSettings();
+                            renderPagesList();
+                            if (pages.length > 0) {
+                                loadPage(pages[0].id);
+                            }
+                            showToast('Imported successfully!');
+                        }
+                    } catch (error) {
+                        showToast('Error importing file!');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Google Drive Functions
+        function initGoogleDrive() {
+            gapi.load('client:auth2', () => {
+                gapi.client.init({
+                    apiKey: API_KEY,
+                    clientId: CLIENT_ID,
+                    discoveryDocs: DISCOVERY_DOCS,
+                    scope: SCOPES
+                }).then(() => {
+                    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+                });
+            });
+        }
+
+        function updateSigninStatus(isSignedIn) {
+            isGoogleSignedIn = isSignedIn;
+        }
+
+        function saveToGoogleDrive() {
+            if (!isGoogleSignedIn) {
+                gapi.auth2.getAuthInstance().signIn().then(() => {
+                    uploadToDrive();
+                });
+            } else {
+                uploadToDrive();
+            }
+        }
+
+        function uploadToDrive() {
+            savePage();
+            const file = new Blob([JSON.stringify({
+                pages: pages,
+                globalTheme: globalTheme,
+                exportedAt: new Date().toISOString(),
+                version: '1.1'
+            }, null, 2)], {type: 'application/json'});
+            
+            const metadata = {
+                'name': `noteflow_backup_${new Date().toISOString().split('T')[0]}.json`,
+                'mimeType': 'application/json'
+            };
+            
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+            form.append('file', file);
+            
+            fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({'Authorization': 'Bearer ' + gapi.auth.getToken().access_token}),
+                body: form
+            }).then(response => {
+                showToast('Saved to Google Drive!');
+            }).catch(error => {
+                showToast('Error saving to Google Drive!');
+            });
+        }
+
+        // Text Formatting Functions
+        function formatText(command) {
+            document.execCommand(command, false, null);
+            document.getElementById('editor').focus();
+        }
+
+        function formatBlock(tag) {
+            if (tag === 'blockquote' || tag === 'pre') {
+                document.execCommand('formatBlock', false, tag);
+            } else {
+                document.execCommand('formatBlock', false, `<${tag}>`);
+            }
+            document.getElementById('editor').focus();
+        }
+
+        function insertLink() {
+            const url = prompt('Enter URL:');
+            if (url) {
+                document.execCommand('createLink', false, url);
+                document.getElementById('editor').focus();
+            }
+        }
+
+        // UI Functions
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            document.getElementById('newPageName').value = '';
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Utility Functions
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + S to save
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveToLocal();
+            }
+            
+            // Ctrl/Cmd + N for new page
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                createNewPage();
+            }
+            
+            // Ctrl/Cmd + Shift + T for theme panel
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+                e.preventDefault();
+                toggleThemePanel();
+            }
+            
+            // Escape to close modal
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+                document.getElementById('themePanel').classList.remove('active');
+            }
+        });
+
+        // Close modal when clicking outside
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Close theme panel when clicking outside
+        document.addEventListener('click', (e) => {
+            const themePanel = document.getElementById('themePanel');
+            const themeSwitcher = document.querySelector('.theme-switcher-btn');
+            
+            if (!themePanel.contains(e.target) && !themeSwitcher.contains(e.target)) {
+                themePanel.classList.remove('active');
+            }
+        });
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            // Uncomment the next line when you have Google API credentials
+            // initGoogleDrive();
+        });
+
+        // Prevent data loss on page unload
+        window.addEventListener('beforeunload', (e) => {
+            savePage();
+            savePagesToLocal();
+        });
+    </script>
+</body>
+</html>
