@@ -24,7 +24,7 @@ In an era of cloud lock-in and privacy concerns, NoteFlow puts you back in contr
     * Choose from 6 beautiful preset themes (including Dark, Sepia, and Forest).
     * Create your own themes with a custom color picker for backgrounds, text, and accents.
 * **💾 Robust Data Management**:
-    * **Auto-Save**: Changes are saved automatically to your browser's local storage.
+    * **One-click-Save**: Click the save locally button and the changes are saved to your browser's local storage.
     * **Export/Import**: Download your entire workspace to a single `.json` file for easy backups or sharing.
     * **Optional Google Drive Backup**: Securely back up your workspace to your own Google Drive account.
 * **⌨️ Keyboard Shortcuts**: Boost your productivity with shortcuts for saving, creating new pages, and toggling the theme panel.
