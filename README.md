@@ -2,7 +2,7 @@
 
 **Your notes, your data, your machine. All in a single HTML file.**
 
-![NoteFlow Interface Screenshot](https://i.imgur.com/g8z6F9c.png)
+![NoteFlow Interface Screenshot](https://raw.githubusercontent.com/tanujranjith/Notion-local-saving-clone/refs/heads/main/Screenshot%202025-09-02%20081237.png?token=GHSAT0AAAAAADKG4WGBW3LSHOWUFAA2BBKW2FW4ALA)
 
 NoteFlow is a powerful, self-contained note-taking application that runs entirely in your browser. It's designed for users who value privacy, data ownership, and simplicity. Unlike cloud-based services like Notion, NoteFlow is **local-first**, meaning your entire workspace lives on your device. No accounts, no servers, no subscriptions.
 
