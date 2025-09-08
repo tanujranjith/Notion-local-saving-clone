@@ -1,5 +1,5 @@
 # NoteFlow - A Local-First, Private Alternative to Notion
-https://noteflowlocal.github.io/
+https://noteflowlocal.github.io/ (_hosted on a different github account_)
 
 **Your notes, your data, your machine. All in a single HTML file.**
 
