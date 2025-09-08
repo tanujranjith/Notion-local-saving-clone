@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteFlow - Your Personal Workspace</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7f7f5;
+            --bg-hover: #efefef;
+            --text-primary: #37352f;
+            --text-secondary: #787774;
+            --border: #e0e0e0;
+            --accent: #0084ff;
+            --sidebar-width: 260px;
+            --editor-bg: #ffffff;
+            --code-bg: #f7f7f5;
+        }
+
+        /* Predefined Themes */
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --bg-hover: #3a3a3a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border: #404040;
+            --accent: #4a9eff;
+            --editor-bg: #1e1e1e;
+            --code-bg: #2d2d2d;
+        }
+
+        [data-theme="sepia"] {
+            --bg-primary: #f4ecd8;
+            --bg-secondary: #ede0c8;
+            --bg-hover: #e6d4b1;
+            --text-primary: #5c4b37;
+            --text-secondary: #8b7355;
+            --border: #d4c4a8;
+            --accent: #b8860b;
+            --editor-bg: #f4ecd8;
+            --code-bg: #ede0c8;
+        }
+
+        [data-theme="forest"] {
+            --bg-primary: #1a2f1a;
+            --bg-secondary: #243524;
+            --bg-hover: #2e422e;
+            --text-primary: #c9d4c9;
+            --text-secondary: #8fa68f;
+            --border: #3a4f3a;
+            --accent: #4caf50;
+            --editor-bg: #1a2f1a;
+            --code-bg: #243524;
+        }
+
+        [data-theme="ocean"] {
+            --bg-primary: #0a1929;
+            --bg-secondary: #132337;
+            --bg-hover: #1c2f45;
+            --text-primary: #b8cfe5;
+            --text-secondary: #7a92aa;
+            --border: #2a3f56;
+            --accent: #00bcd4;
+            --editor-bg: #0a1929;
+            --code-bg: #132337;
+        }
+
+        [data-theme="sunset"] {
+            --bg-primary: #2b1b3d;
+            --bg-secondary: #3a2750;
+            --bg-hover: #4a3460;
+            --text-primary: #f4b8c2;
+            --text-secondary: #c08a96;
+            --border: #4a3460;
+            --accent: #ff6b9d;
+            --editor-bg: #2b1b3d;
+            --code-bg: #3a2750;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Theme Switcher Button */
+        .theme-switcher-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+
+        .theme-switcher-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Theme Panel */
+        .theme-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 200;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .theme-panel.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .theme-panel-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .theme-panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .apply-mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .page-selector {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .page-selector.active {
+            display: block;
+        }
+
+        .page-selector-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+        }
+
+        .page-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .page-checkbox:hover {
+            background: var(--bg-hover);
+        }
+
+        .page-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .theme-presets {
+            margin-bottom: 20px;
+        }
+
+        .preset-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .preset-card {
+            padding: 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .preset-card.active {
+            border-color: var(--accent);
+        }
+
+        .preset-card.active::after {
+            content: '✓';
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: var(--accent);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .preset-preview {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 8px;
+            height: 30px;
+        }
+
+        .preset-color {
+            flex: 1;
+            border-radius: 4px;
+        }
+
+        .preset-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .custom-colors {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .color-input-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .color-input-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-input-item label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex: 1;
+        }
+
+        .color-input-item input[type="color"] {
+            width: 40px;
+            height: 30px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .theme-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .reset-theme-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .reset-theme-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease, background-color 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            margin-left: calc(-1 * var(--sidebar-width));
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .workspace-name {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .page-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2px;
+            transition: background 0.2s;
+            position: relative;
+        }
+        
+        .page-item .page-item-icons {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .page-item:hover .page-item-icons {
+            display: flex;
+        }
+
+        .page-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .page-item.active {
+            background: var(--bg-hover);
+        }
+
+        .page-item i {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .page-item-icons i {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        
+        .page-item-icons i:hover {
+            opacity: 1;
+        }
+
+        .page-theme-indicator {
+            position: absolute;
+            right: 12px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+        }
+        
+        .page-item:hover .page-theme-indicator {
+            display: none;
+        }
+
+
+        .add-page-btn {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .add-page-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--editor-bg);
+            transition: background-color 0.3s ease;
+        }
+
+        .toolbar {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--bg-primary);
+            transition: background-color 0.3s ease;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .toolbar-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+
+        /* Editor Area */
+        .editor-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .page-title {
+            font-size: 40px;
+            font-weight: 700;
+            border: none;
+            outline: none;
+            width: 100%;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            background: transparent;
+        }
+
+        .editor {
+            min-height: 500px;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.8;
+            color: var(--text-primary);
+        }
+
+        .editor h1 {
+            font-size: 32px;
+            margin: 20px 0;
+        }
+
+        .editor h2 {
+            font-size: 24px;
+            margin: 18px 0;
+        }
+
+        .editor h3 {
+            font-size: 20px;
+            margin: 16px 0;
+        }
+
+        .editor p {
+            margin: 12px 0;
+        }
+
+        .editor ul, .editor ol {
+            margin: 12px 0;
+            padding-left: 30px;
+        }
+
+        .editor blockquote {
+            border-left: 3px solid var(--text-secondary);
+            padding-left: 20px;
+            margin: 15px 0;
+            color: var(--text-secondary);
+        }
+
+        .editor pre {
+            background: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .editor code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .modal-input:focus {
+            border-color: var(--accent);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Storage Options */
+        .storage-options {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            max-width: 500px;
+        }
+
+        .storage-btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+
+        .storage-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Toggle Button */
+        .toggle-sidebar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .toggle-sidebar {
+                display: block;
+            }
+            
+            .sidebar {
+                position: fixed;
+                z-index: 99;
+                height: 100vh;
+            }
+            
+            .editor-container {
+                padding: 20px;
+            }
+
+            .storage-options {
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                justify-content: center;
+            }
+
+            .theme-panel {
+                width: calc(100% - 40px);
+                right: 20px;
+                left: 20px;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid var(--bg-hover);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 2000;
+            animation: slideUp 0.3s ease;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="workspace-name">
+                    <i class="fas fa-cube"></i>
+                    <span>My Workspace</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <div class="section-title">
+                        <span>Pages</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div id="pagesList"></div>
+                    <button class="add-page-btn" onclick="createNewPage()">
+                        <i class="fas fa-plus"></i>
+                        <span>Add a page</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <button class="toolbar-btn" onclick="formatText('bold')">
+                    <i class="fas fa-bold"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatText('italic')">
+                    <i class="fas fa-italic"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatText('underline')">
+                    <i class="fas fa-underline"></i>
+                </button>
+                
+                <div class="toolbar-separator"></div>
+                
+                <button class="toolbar-btn" onclick="formatBlock('h1')">
+                    H1
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('h2')">
+                    H2
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('h3')">
+                    H3
+                </button>
+                
+                <div class="toolbar-separator"></div>
+                
+                <button class="toolbar-btn" onclick="formatText('insertUnorderedList')">
+                    <i class="fas fa-list-ul"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatText('insertOrderedList')">
+                    <i class="fas fa-list-ol"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('blockquote')">
+                    <i class="fas fa-quote-left"></i>
+                </button>
+                
+                <div class="toolbar-separator"></div>
+                
+                <button class="toolbar-btn" onclick="insertLink()">
+                    <i class="fas fa-link"></i>
+                </button>
+                <button class="toolbar-btn" onclick="formatBlock('pre')">
+                    <i class="fas fa-code"></i>
+                </button>
+            </div>
+
+            <!-- Editor -->
+            <div class="editor-container">
+                <input type="text" class="page-title" id="pageTitle" placeholder="Untitled" />
+                <div class="editor" id="editor" contenteditable="true" placeholder="Start typing..."></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Switcher Button -->
+    <button class="theme-switcher-btn" onclick="toggleThemePanel()">
+        <i class="fas fa-palette"></i>
+    </button>
+
+    <!-- Theme Panel -->
+    <div class="theme-panel" id="themePanel">
+        <div class="theme-panel-header">
+            <h3 class="theme-panel-title">🎨 Theme Settings</h3>
+            
+            <div class="apply-mode-toggle">
+                <button class="mode-btn active" onclick="setApplyMode('current')">
+                    Current Page Only
+                </button>
+                <button class="mode-btn" onclick="setApplyMode('all')">
+                    All Pages
+                </button>
+                <button class="mode-btn" onclick="setApplyMode('custom')">
+                    Select Pages
+                </button>
+            </div>
+
+            <div class="page-selector" id="pageSelector">
+                <div class="page-selector-title">Select pages to apply theme:</div>
+                <div id="pageSelectorList"></div>
+            </div>
+        </div>
+
+        <div class="theme-presets">
+            <div class="preset-title">Preset Themes</div>
+            <div class="preset-grid">
+                <div class="preset-card active" onclick="applyPresetTheme('default')" data-theme="default">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #ffffff"></div>
+                        <div class="preset-color" style="background: #f7f7f5"></div>
+                        <div class="preset-color" style="background: #0084ff"></div>
+                    </div>
+                    <div class="preset-name">Default</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('dark')" data-theme="dark">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #1e1e1e"></div>
+                        <div class="preset-color" style="background: #2d2d2d"></div>
+                        <div class="preset-color" style="background: #4a9eff"></div>
+                    </div>
+                    <div class="preset-name">Dark</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('sepia')" data-theme="sepia">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #f4ecd8"></div>
+                        <div class="preset-color" style="background: #ede0c8"></div>
+                        <div class="preset-color" style="background: #b8860b"></div>
+                    </div>
+                    <div class="preset-name">Sepia</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('forest')" data-theme="forest">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #1a2f1a"></div>
+                        <div class="preset-color" style="background: #243524"></div>
+                        <div class="preset-color" style="background: #4caf50"></div>
+                    </div>
+                    <div class="preset-name">Forest</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('ocean')" data-theme="ocean">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #0a1929"></div>
+                        <div class="preset-color" style="background: #132337"></div>
+                        <div class="preset-color" style="background: #00bcd4"></div>
+                    </div>
+                    <div class="preset-name">Ocean</div>
+                </div>
+
+                <div class="preset-card" onclick="applyPresetTheme('sunset')" data-theme="sunset">
+                    <div class="preset-preview">
+                        <div class="preset-color" style="background: #2b1b3d"></div>
+                        <div class="preset-color" style="background: #3a2750"></div>
+                        <div class="preset-color" style="background: #ff6b9d"></div>
+                    </div>
+                    <div class="preset-name">Sunset</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="custom-colors">
+            <div class="preset-title">Custom Colors</div>
+            <div class="color-input-group">
+                <div class="color-input-item">
+                    <label>Background</label>
+                    <input type="color" id="customBgPrimary" onchange="applyCustomColors()">
+                </div>
+                <div class="color-input-item">
+                    <label>Secondary</label>
+                    <input type="color" id="customBgSecondary" onchange="applyCustomColors()">
+                </div>
+                <div class="color-input-item">
+                    <label>Text</label>
+                    <input type="color" id="customTextPrimary" onchange="applyCustomColors()">
+                </div>
+                <div class="color-input-item">
+                    <label>Accent</label>
+                    <input type="color" id="customAccent" onchange="applyCustomColors()">
+                </div>
+            </div>
+        </div>
+
+        <div class="theme-actions">
+            <button class="reset-theme-btn" onclick="resetTheme()">
+                <i class="fas fa-undo"></i> Reset to Default
+            </button>
+        </div>
+    </div>
+
+    <!-- Toggle Sidebar Button -->
+    <button class="toggle-sidebar" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Storage Options -->
+    <div class="storage-options">
+        <button class="storage-btn" onclick="saveToLocal()">
+            <i class="fas fa-save"></i>
+            Save Locally
+        </button>
+        <button class="storage-btn" onclick="exportToFile()">
+            <i class="fas fa-download"></i>
+            Export
+        </button>
+        <button class="storage-btn" onclick="importFromFile()">
+            <i class="fas fa-upload"></i>
+            Import
+        </button>
+        <button class="storage-btn" onclick="saveToGoogleDrive()">
+            <i class="fab fa-google-drive"></i>
+            Save to Drive
+        </button>
+    </div>
+
+    <!-- Modal for new page -->
+    <div class="modal" id="newPageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Page</h3>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="modal-input" id="newPageName" placeholder="Enter page name (use :: for hierarchy)..." />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('newPageModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmNewPage()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for renaming page -->
+    <div class="modal" id="renamePageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Rename Page</h3>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="modal-input" id="renamePageName" placeholder="Enter new page name..." />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('renamePageModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmRename()">Save</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Hidden file input -->
+    <input type="file" id="fileInput" style="display: none;" accept=".json,.txt,.html" />
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Google Drive API Configuration
+        const CLIENT_ID = 'YOUR_CLIENT_ID'; // Replace with your Google Client ID
+        const API_KEY = 'YOUR_API_KEY'; // Replace with your Google API Key
+        const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        // Application State
+        let pages = [];
+        let currentPageId = null;
+        let pageToRenameId = null; // For rename functionality
+        let isGoogleSignedIn = false;
+        let themeApplyMode = 'current'; // 'current', 'all', 'custom'
+        let selectedPagesForTheme = [];
+        let globalTheme = 'default';
+
+        // Theme configurations
+        const themes = {
+            default: {
+                name: 'Default',
+                bgPrimary: '#ffffff',
+                bgSecondary: '#f7f7f5',
+                bgHover: '#efefef',
+                textPrimary: '#37352f',
+                textSecondary: '#787774',
+                border: '#e0e0e0',
+                accent: '#0084ff',
+                editorBg: '#ffffff',
+                codeBg: '#f7f7f5'
+            },
+            dark: {
+                name: 'Dark',
+                bgPrimary: '#1e1e1e',
+                bgSecondary: '#2d2d2d',
+                bgHover: '#3a3a3a',
+                textPrimary: '#e0e0e0',
+                textSecondary: '#a0a0a0',
+                border: '#404040',
+                accent: '#4a9eff',
+                editorBg: '#1e1e1e',
+                codeBg: '#2d2d2d'
+            },
+            sepia: {
+                name: 'Sepia',
+                bgPrimary: '#f4ecd8',
+                bgSecondary: '#ede0c8',
+                bgHover: '#e6d4b1',
+                textPrimary: '#5c4b37',
+                textSecondary: '#8b7355',
+                border: '#d4c4a8',
+                accent: '#b8860b',
+                editorBg: '#f4ecd8',
+                codeBg: '#ede0c8'
+            },
+            forest: {
+                name: 'Forest',
+                bgPrimary: '#1a2f1a',
+                bgSecondary: '#243524',
+                bgHover: '#2e422e',
+                textPrimary: '#c9d4c9',
+                textSecondary: '#8fa68f',
+                border: '#3a4f3a',
+                accent: '#4caf50',
+                editorBg: '#1a2f1a',
+                codeBg: '#243524'
+            },
+            ocean: {
+                name: 'Ocean',
+                bgPrimary: '#0a1929',
+                bgSecondary: '#132337',
+                bgHover: '#1c2f45',
+                textPrimary: '#b8cfe5',
+                textSecondary: '#7a92aa',
+                border: '#2a3f56',
+                accent: '#00bcd4',
+                editorBg: '#0a1929',
+                codeBg: '#132337'
+            },
+            sunset: {
+                name: 'Sunset',
+                bgPrimary: '#2b1b3d',
+                bgSecondary: '#3a2750',
+                bgHover: '#4a3460',
+                textPrimary: '#f4b8c2',
+                textSecondary: '#c08a96',
+                border: '#4a3460',
+                accent: '#ff6b9d',
+                editorBg: '#2b1b3d',
+                codeBg: '#3a2750'
+            }
+        };
+
+        // Initialize the app
+        function initApp() {
+            loadPagesFromLocal();
+            loadThemeSettings();
+            
+            ensureHelpPage();
+            
+            if (pages.length === 0) {
+                createDefaultPage();
+            } else if (!currentPageId || !pages.find(p => p.id === currentPageId)) {
+                loadPage(pages.find(p => p.id !== 'help_page')?.id || pages[0].id);
+            }
+            
+            renderPagesList();
+            
+            // Auto-save every 30 seconds
+            setInterval(autoSave, 30000);
+            
+            // Save on input
+            document.getElementById('pageTitle').addEventListener('input', debounce(savePage, 1000));
+            document.getElementById('editor').addEventListener('input', debounce(savePage, 1000));
+        }
+
+        // Theme Management Functions
+        function toggleThemePanel() {
+            const panel = document.getElementById('themePanel');
+            panel.classList.toggle('active');
+            
+            if (panel.classList.contains('active')) {
+                updatePageSelectorList();
+            }
+        }
+
+        function setApplyMode(mode) {
+            themeApplyMode = mode;
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const selector = document.getElementById('pageSelector');
+            selector.classList.toggle('active', mode === 'custom');
+            if (mode === 'custom') updatePageSelectorList();
+        }
+
+        function updatePageSelectorList() {
+            const list = document.getElementById('pageSelectorList');
+            list.innerHTML = '';
+            
+            pages.forEach(page => {
+                const checkbox = document.createElement('div');
+                checkbox.className = 'page-checkbox';
+                checkbox.innerHTML = `
+                    <input type="checkbox" id="theme-page-${page.id}" 
+                           ${selectedPagesForTheme.includes(page.id) ? 'checked' : ''}>
+                    <label for="theme-page-${page.id}" style="cursor: pointer; flex: 1;">
+                        ${page.title}
+                    </label>
+                `;
+                
+                checkbox.querySelector('input').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        selectedPagesForTheme.push(page.id);
+                    } else {
+                        selectedPagesForTheme = selectedPagesForTheme.filter(id => id !== page.id);
+                    }
+                });
+                
+                list.appendChild(checkbox);
+            });
+        }
+
+        function applyPresetTheme(themeName) {
+            document.querySelectorAll('.preset-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.theme === themeName);
+            });
+            
+            if (themeApplyMode === 'all') {
+                globalTheme = themeName;
+                pages.forEach(page => { page.theme = themeName; });
+                document.body.setAttribute('data-theme', themeName);
+            } else if (themeApplyMode === 'current') {
+                const page = pages.find(p => p.id === currentPageId);
+                if (page) page.theme = themeName;
+                document.body.setAttribute('data-theme', themeName);
+            } else if (themeApplyMode === 'custom') {
+                selectedPagesForTheme.forEach(pageId => {
+                    const page = pages.find(p => p.id === pageId);
+                    if (page) page.theme = themeName;
+                });
+                if (selectedPagesForTheme.includes(currentPageId)) {
+                    document.body.setAttribute('data-theme', themeName);
+                }
+            }
+            
+            savePagesToLocal();
+            saveThemeSettings();
+            renderPagesList();
+            showToast(`Theme applied: ${themes[themeName].name}`);
+        }
+
+        function applyCustomColors() {
+            const customTheme = {
+                bgPrimary: document.getElementById('customBgPrimary').value,
+                bgSecondary: document.getElementById('customBgSecondary').value,
+                textPrimary: document.getElementById('customTextPrimary').value,
+                accent: document.getElementById('customAccent').value
+            };
+            
+            const root = document.documentElement;
+            Object.keys(customTheme).forEach(key => {
+                root.style.setProperty(`--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`, customTheme[key]);
+            });
+
+            const applyToPage = (page) => {
+                page.customTheme = customTheme;
+                page.theme = 'custom';
+            };
+            
+            if (themeApplyMode === 'all') pages.forEach(applyToPage);
+            else if (themeApplyMode === 'current') applyToPage(pages.find(p => p.id === currentPageId));
+            else if (themeApplyMode === 'custom') {
+                selectedPagesForTheme.forEach(pageId => applyToPage(pages.find(p => p.id === pageId)));
+            }
+            
+            savePagesToLocal();
+            saveThemeSettings();
+            showToast('Custom colors applied!');
+        }
+
+        function resetTheme() {
+            const resetPage = (page) => {
+                page.theme = 'default';
+                delete page.customTheme;
+            };
+
+            if (themeApplyMode === 'all') {
+                pages.forEach(resetPage);
+                globalTheme = 'default';
+            } else if (themeApplyMode === 'current') {
+                resetPage(pages.find(p => p.id === currentPageId));
+            } else if (themeApplyMode === 'custom') {
+                selectedPagesForTheme.forEach(pageId => resetPage(pages.find(p => p.id === pageId)));
+            }
+            
+            document.body.setAttribute('data-theme', 'default');
+            document.documentElement.style = '';
+            
+            savePagesToLocal();
+            saveThemeSettings();
+            renderPagesList();
+            showToast('Theme reset to default!');
+        }
+
+        function loadPageTheme(pageId) {
+            const page = pages.find(p => p.id === pageId);
+            const themeToApply = (page && page.theme) ? page.theme : globalTheme;
+            
+            if (themeToApply === 'custom' && page.customTheme) {
+                const root = document.documentElement;
+                Object.entries(page.customTheme).forEach(([key, value]) => {
+                     root.style.setProperty(`--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`, value);
+                });
+                document.body.removeAttribute('data-theme');
+            } else {
+                document.body.setAttribute('data-theme', themeToApply);
+                document.documentElement.style = '';
+            }
+        }
+
+        function saveThemeSettings() {
+            localStorage.setItem('noteflow_theme_settings', JSON.stringify({
+                globalTheme,
+                selectedPagesForTheme
+            }));
+        }
+
+        function loadThemeSettings() {
+            const settings = JSON.parse(localStorage.getItem('noteflow_theme_settings') || '{}');
+            globalTheme = settings.globalTheme || 'default';
+            selectedPagesForTheme = settings.selectedPagesForTheme || [];
+        }
+        
+        // --- HELP PAGE ---
+        function ensureHelpPage() {
+            if (!pages.some(p => p.id === 'help_page')) {
+                pages.push({
+                    id: 'help_page',
+                    title: 'Help & Docs',
+                    collapsed: false,
+                    content: `
+                        <h2>Welcome to <strong>NoteFlow Help</strong> 📚</h2>
+                        <p>This page guides you through using NoteFlow effectively.</p>
+                        
+                        <h3><i class="fas fa-sitemap"></i> Creating Hierarchical Pages</h3>
+                        <p>You can nest pages by separating levels with <code>::</code> in the page title. For example:</p>
+                        <ul>
+                          <li><code>Projects</code> (parent)</li>
+                          <li><code>Projects::Website Redesign</code> (child)</li>
+                          <li><code>Projects::Website Redesign::Sprint Backlog</code> (grand‑child)</li>
+                        </ul>
+                        <p>The sidebar will automatically indent pages to reflect this structure.</p>
+
+                        <h3><i class="fas fa-folder-tree"></i> Collapsing & Expanding Pages</h3>
+                        <p>Parent pages will have a chevron icon <i class="fas fa-chevron-down"></i> next to them. Click this icon to collapse or expand the list of child pages, helping you keep your workspace tidy.</p>
+                        
+                        <h3><i class="fas fa-edit"></i> Renaming and Deleting Pages</h3>
+                        <p>In the sidebar, hover over any page to reveal two icons:</p>
+                        <ul>
+                          <li><i class="fas fa-pencil-alt"></i> &mdash; Click to rename a page. Renaming a parent will automatically update the paths of all its children.</li>
+                          <li><i class="fas fa-trash"></i> &mdash; Click to delete a page. This action is permanent.</li>
+                        </ul>
+
+                        <h3><i class="fab fa-google-drive"></i> Google Drive Backup</h3>
+                        <p>You can connect NoteFlow to Google Drive to back up your workspace. This requires setting up API credentials.</p>
+                        <ol>
+                          <li>Open the Google Cloud Console &rarr; <em>APIs & Services</em> &rarr; <em>Credentials</em>.</li>
+                          <li>Create an <strong>OAuth 2.0 Client ID</strong> for a <em>Web application</em>.</li>
+                          <li>Copy the generated <code>CLIENT_ID</code> and <code>API_KEY</code>.</li>
+                          <li>In the app's script, replace the placeholder values.</li>
+                          <li>Uncomment <code>initGoogleDrive();</code> inside the <code>DOMContentLoaded</code> listener.</li>
+                        </ol>
+
+                        <h3><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h3>
+                        <ul>
+                          <li><kbd>Ctrl/Cmd + S</kbd> &mdash; Save locally</li>
+                          <li><kbd>Ctrl/Cmd + N</kbd> &mdash; New page</li>
+                          <li><kbd>Ctrl/Cmd + Shift + T</kbd> &mdash; Open theme panel</li>
+                          <li><kbd>Esc</kbd> &mdash; Close modals and panels</li>
+                        </ul>`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    theme: 'default'
+                });
+            }
+        }
+
+        // Create default page
+        function createDefaultPage() {
+            const defaultPage = {
+                id: generateId(),
+                title: 'Welcome to NoteFlow',
+                collapsed: false,
+                content: '<h2>Welcome to NoteFlow! 🎉</h2><p>This is your personal workspace where you can:</p><ul><li>Create and organize pages in a hierarchy</li><li>Collapse and expand nested pages</li><li>Rename pages directly from the sidebar</li><li>Apply custom themes</li><li>Save your work locally or to Google Drive</li></ul><p>Check out the <b>Help & Docs</b> page for more details!</p>',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                theme: 'default'
+            };
+            pages.push(defaultPage);
+            currentPageId = defaultPage.id;
+            savePagesToLocal();
+        }
+
+        // Generate unique ID
+        function generateId() {
+            return '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Page Management
+        function createNewPage() {
+            document.getElementById('newPageModal').classList.add('active');
+            document.getElementById('newPageName').focus();
+        }
+
+        function confirmNewPage() {
+            const name = document.getElementById('newPageName').value.trim();
+            if (name) {
+                const newPage = {
+                    id: generateId(),
+                    title: name,
+                    content: '',
+                    collapsed: false,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    theme: globalTheme
+                };
+                pages.push(newPage);
+                savePagesToLocal();
+                renderPagesList();
+                loadPage(newPage.id);
+                closeModal('newPageModal');
+                showToast('Page created successfully!');
+            }
+        }
+        
+        function showRenameModal(pageId) {
+            pageToRenameId = pageId;
+            const page = pages.find(p => p.id === pageId);
+            if(page) {
+                document.getElementById('renamePageName').value = page.title;
+                document.getElementById('renamePageModal').classList.add('active');
+                document.getElementById('renamePageName').focus();
+            }
+        }
+        
+        function confirmRename() {
+            if (!pageToRenameId) return;
+            
+            const page = pages.find(p => p.id === pageToRenameId);
+            const oldTitle = page.title;
+            const newTitle = document.getElementById('renamePageName').value.trim();
+            
+            if (newTitle && newTitle !== oldTitle) {
+                page.title = newTitle;
+                
+                // Update children titles
+                const oldPrefix = oldTitle + '::';
+                const newPrefix = newTitle + '::';
+                pages.forEach(p => {
+                    if (p.title.startsWith(oldPrefix)) {
+                        p.title = p.title.replace(oldPrefix, newPrefix);
+                    }
+                });
+
+                if (currentPageId === pageToRenameId) {
+                    document.getElementById('pageTitle').value = newTitle.split('::').pop();
+                }
+                
+                savePagesToLocal();
+                renderPagesList();
+                closeModal('renamePageModal');
+                showToast('Page renamed!');
+            } else {
+                closeModal('renamePageModal');
+            }
+        }
+        
+        function toggleCollapse(pageId) {
+            const page = pages.find(p => p.id === pageId);
+            if (page) {
+                page.collapsed = !page.collapsed;
+                savePagesToLocal();
+                renderPagesList();
+            }
+        }
+
+        function loadPage(pageId) {
+            if (currentPageId) savePage(); // Save current page before switching
+            
+            const page = pages.find(p => p.id === pageId);
+            if (page) {
+                currentPageId = pageId;
+                document.getElementById('pageTitle').value = page.title.split('::').pop();
+                document.getElementById('editor').innerHTML = page.content;
+                
+                loadPageTheme(pageId);
+                
+                document.querySelectorAll('.page-item').forEach(item => {
+                    item.classList.toggle('active', item.dataset.pageId === pageId);
+                });
+            }
+        }
+
+        function savePage() {
+            if (!currentPageId) return;
+            
+            const page = pages.find(p => p.id === currentPageId);
+            if (page) {
+                const titleInput = document.getElementById('pageTitle').value || 'Untitled';
+                const titleParts = page.title.split('::');
+                titleParts[titleParts.length - 1] = titleInput;
+                page.title = titleParts.join('::');
+
+                page.content = document.getElementById('editor').innerHTML;
+                page.updatedAt = new Date().toISOString();
+                savePagesToLocal();
+                // A soft-render to update title in sidebar without full redraw
+                const pageItemSpan = document.querySelector(`.page-item[data-page-id="${currentPageId}"] span`);
+                if (pageItemSpan) pageItemSpan.textContent = titleInput;
+            }
+        }
+
+        function deletePage(pageId) {
+            const pageToDelete = pages.find(p => p.id === pageId);
+            if (confirm(`Are you sure you want to delete "${pageToDelete.title}" and all its sub-pages?`)) {
+                const prefix = pageToDelete.title + '::';
+                const idsToDelete = new Set([pageId]);
+                pages.forEach(p => {
+                    if (p.title.startsWith(prefix)) {
+                        idsToDelete.add(p.id);
+                    }
+                });
+
+                pages = pages.filter(p => !idsToDelete.has(p.id));
+                savePagesToLocal();
+                
+                if (idsToDelete.has(currentPageId)) {
+                    if (pages.length > 0) {
+                        loadPage(pages[0].id);
+                    } else {
+                        createDefaultPage();
+                        loadPage(pages[0].id);
+                    }
+                }
+                
+                renderPagesList();
+                showToast('Page deleted successfully!');
+            }
+        }
+
+        // Hierarchical Sidebar Rendering
+        function renderPagesList() {
+            const pagesList = document.getElementById('pagesList');
+            pagesList.innerHTML = '';
+            
+            const sorted = [...pages].sort((a, b) => a.title.localeCompare(b.title));
+            const pageMap = new Map(pages.map(p => [p.id, p]));
+            const childrenMap = new Map();
+            
+            // Build parent-child relationships
+            sorted.forEach(page => {
+                const parts = page.title.split('::');
+                if (parts.length > 1) {
+                    const parentTitle = parts.slice(0, -1).join('::');
+                    const parent = sorted.find(p => p.title === parentTitle);
+                    if (parent) {
+                        if (!childrenMap.has(parent.id)) childrenMap.set(parent.id, []);
+                        childrenMap.get(parent.id).push(page.id);
+                    }
+                }
+            });
+
+            // Recursive function to render page tree
+            function renderTree(pageId, depth) {
+                const page = pageMap.get(pageId);
+                if (!page) return;
+
+                const displayTitle = page.title.split('::').pop();
+                const hasChildren = childrenMap.has(page.id);
+                
+                let themeColor = '#ccc'; // Default color
+                if (page.theme && page.theme !== 'default') {
+                    if (page.theme === 'custom' && page.customTheme) {
+                        themeColor = page.customTheme.accent;
+                    } else if (themes[page.theme]) {
+                        themeColor = themes[page.theme].accent;
+                    }
+                }
+
+                const pageItem = document.createElement('div');
+                pageItem.className = 'page-item';
+                pageItem.dataset.pageId = page.id;
+                pageItem.classList.toggle('active', page.id === currentPageId);
+                pageItem.style.paddingLeft = (12 + depth * 20) + 'px';
+                pageItem.onclick = () => loadPage(page.id);
+                
+                const collapseIcon = hasChildren 
+                    ? `<i class="fas ${page.collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}" style="width:14px; text-align:center; cursor:pointer;" onclick="event.stopPropagation(); toggleCollapse('${page.id}')"></i>`
+                    : `<i class="fas fa-file-alt" style="width:14px; text-align:center;"></i>`;
+                
+                const themeIndicator = (page.theme && page.theme !== 'default') 
+                    ? `<div class="page-theme-indicator" style="background:${themeColor};" title="Custom theme applied"></div>` : '';
+
+                pageItem.innerHTML = `
+                    ${collapseIcon}
+                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${displayTitle}</span>
+                    ${themeIndicator}
+                    <div class="page-item-icons">
+                         <i class="fas fa-pencil-alt" title="Rename" onclick="event.stopPropagation(); showRenameModal('${page.id}')"></i>
+                         <i class="fas fa-trash" title="Delete" onclick="event.stopPropagation(); deletePage('${page.id}')"></i>
+                    </div>
+                `;
+                
+                pagesList.appendChild(pageItem);
+
+                if (hasChildren && !page.collapsed) {
+                    childrenMap.get(page.id).forEach(childId => renderTree(childId, depth + 1));
+                }
+            }
+            
+            // Start rendering from top-level pages
+            sorted.filter(p => !p.title.includes('::')).forEach(page => renderTree(page.id, 0));
+        }
+
+        // Local Storage Functions
+        function savePagesToLocal() {
+            localStorage.setItem('noteflow_pages', JSON.stringify(pages));
+        }
+
+        function loadPagesFromLocal() {
+            const stored = localStorage.getItem('noteflow_pages');
+            if (stored) {
+                pages = JSON.parse(stored);
+                // Migration for new properties
+                pages.forEach(p => {
+                    if (p.collapsed === undefined) p.collapsed = false;
+                });
+            }
+        }
+
+        function saveToLocal() {
+            savePage();
+            savePagesToLocal();
+            showToast('Saved to local storage!');
+        }
+
+        function autoSave() {
+            savePage();
+        }
+
+        // Export/Import Functions
+        function exportToFile() {
+            savePage();
+            const dataStr = JSON.stringify({
+                pages,
+                globalTheme,
+                exportedAt: new Date().toISOString(),
+                version: '1.2'
+            }, null, 2);
+            
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const linkElement = document.createElement('a');
+            linkElement.href = url;
+            linkElement.download = `noteflow_export_${new Date().toISOString().split('T')[0]}.json`;
+            linkElement.click();
+            URL.revokeObjectURL(url);
+            
+            showToast('Exported successfully!');
+        }
+
+        function importFromFile() {
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.pages) {
+                            pages = data.pages;
+                            if (data.globalTheme) globalTheme = data.globalTheme;
+                            savePagesToLocal();
+                            saveThemeSettings();
+                            renderPagesList();
+                            if (pages.length > 0) loadPage(pages[0].id);
+                            showToast('Imported successfully!');
+                        }
+                    } catch (error) {
+                        showToast('Error importing file!');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Google Drive Functions (requires credentials)
+        function initGoogleDrive() {
+            gapi.load('client:auth2', () => {
+                gapi.client.init({
+                    apiKey: API_KEY,
+                    clientId: CLIENT_ID,
+                    discoveryDocs: DISCOVERY_DOCS,
+                    scope: SCOPES
+                }).then(() => {
+                    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+                });
+            });
+        }
+
+        function updateSigninStatus(isSignedIn) {
+            isGoogleSignedIn = isSignedIn;
+        }
+
+        function saveToGoogleDrive() {
+            if (!isGoogleSignedIn) {
+                gapi.auth2.getAuthInstance().signIn().then(uploadToDrive, () => showToast('Google Sign-In failed.'));
+            } else {
+                uploadToDrive();
+            }
+        }
+
+        function uploadToDrive() {
+            savePage();
+            const fileContent = JSON.stringify({ pages, globalTheme, version: '1.2' });
+            const file = new Blob([fileContent], {type: 'application/json'});
+            
+            const metadata = {
+                'name': `noteflow_backup_${new Date().toISOString().split('T')[0]}.json`,
+                'mimeType': 'application/json'
+            };
+            
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+            form.append('file', file);
+            
+            fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({'Authorization': 'Bearer ' + gapi.auth.getToken().access_token}),
+                body: form
+            }).then(res => res.json()).then(res => {
+                if (res.error) throw new Error(res.error.message);
+                showToast('Saved to Google Drive!');
+            }).catch(error => {
+                showToast('Error saving to Drive: ' + error.message);
+            });
+        }
+
+        // Text Formatting Functions
+        function formatText(command) {
+            document.execCommand(command, false, null);
+            document.getElementById('editor').focus();
+        }
+
+        function formatBlock(tag) {
+            document.execCommand('formatBlock', false, `<${tag}>`);
+            document.getElementById('editor').focus();
+        }
+
+        function insertLink() {
+            const url = prompt('Enter URL:');
+            if (url) {
+                document.execCommand('createLink', false, url);
+                document.getElementById('editor').focus();
+            }
+        }
+
+        // UI Functions
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            if (modalId === 'newPageModal') document.getElementById('newPageName').value = '';
+            if (modalId === 'renamePageModal') {
+                document.getElementById('renamePageName').value = '';
+                pageToRenameId = null;
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Utility Functions
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Event Listeners
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveToLocal(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); createNewPage(); }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't') { e.preventDefault(); toggleThemePanel(); }
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.active, .theme-panel.active').forEach(el => el.classList.remove('active'));
+            }
+        });
+
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal.id); });
+        });
+
+        document.addEventListener('click', (e) => {
+            const themePanel = document.getElementById('themePanel');
+            const themeSwitcher = document.querySelector('.theme-switcher-btn');
+            if (themePanel.classList.contains('active') && !themePanel.contains(e.target) && !themeSwitcher.contains(e.target)) {
+                themePanel.classList.remove('active');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            // Uncomment the next line when you have Google API credentials
+            // initGoogleDrive();
+        });
+
+        window.addEventListener('beforeunload', savePage);
+    </script>
+
+</body>
+</html>
